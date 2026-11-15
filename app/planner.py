@@ -28,6 +28,26 @@ def api_reset_passed(reset_at, balance, now, window_minutes=300, tolerance_minut
     return api_at
 
 
+def api_reset_fallback(balance):
+    """Resetmoment uit de limietgegevens van de client, voor als geen banner
+    een tijd noemt (de banner met tijd verdwijnt zodra de reset geweest is).
+    Is de weeklimiet op, dan telt de weekreset; anders die van het 5-uursvenster."""
+    from datetime import datetime
+    if not isinstance(balance, dict) or not balance.get("ok"):
+        return None
+    week = balance.get("weekly") or {}
+    five = balance.get("five_hour") or {}
+    pick = week if (week.get("remaining_percent") is not None
+                    and week["remaining_percent"] <= 1.0) else five
+    raw = pick.get("resets_at")
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def is_waiting_label(name, offscreen=False):
     """是否是「等待你回答」的活动状态行。
 

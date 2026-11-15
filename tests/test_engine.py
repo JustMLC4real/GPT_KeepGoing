@@ -44,6 +44,8 @@ def make_engine(cfg, snaps, act_result=None):
 
     engmod.reader.read = fake_read
     engmod.actor.run_act = fake_act
+    # Geen echte limietgegevens van deze machine gebruiken
+    engmod.ratelimit.read_limits = lambda: {"ok": False, "error": "test"}
     cfg.auto_resume = True
     engine = engmod.Engine(cfg, FakeLog(), lambda p: None, None)
     engine.enabled = True
@@ -233,3 +235,22 @@ def run():
 
 if __name__ == "__main__":
     sys.exit(run())
+
+
+def test_quota_without_banner_time_uses_passed_api_reset():
+    # Na een herstart: de banner met tijd is weg (reset al geweest), alleen de
+    # melding zonder tijd staat er nog. Dan telt het resetmoment uit de limietgegevens.
+    from datetime import datetime, timedelta
+    cfg = Config()
+    cfg.locked_project = "P"
+    cfg.locked_thread = "A"
+    engine, calls = make_engine(cfg, [Snap(ok=True, project="P", thread="A",
+                                           goal_status="目标使用受限",
+                                           goal_actions=[C.GOAL_RESUME],
+                                           quota_msgs=["Je hebt je gebruikslimiet bereikt. Controleer de gebruiksinstellingen van je werkruimte om door te gaan."])])
+    passed = (datetime.now().astimezone() - timedelta(hours=1)).isoformat(timespec="seconds")
+    engmod.ratelimit.read_limits = lambda: {
+        "ok": True, "five_hour": {"resets_at": passed, "remaining_percent": 0.0},
+        "weekly": {"resets_at": passed, "remaining_percent": 30.0}}
+    engine._cycle()
+    assert calls["act"] == 1

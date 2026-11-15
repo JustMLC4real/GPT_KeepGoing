@@ -151,6 +151,17 @@ class Engine(threading.Thread):
         elif state == C.ST_QUOTA and self.last_reset is not None:
             snap.reset_at = self.last_reset
             snap.reset_clock = self.last_reset_clock
+        elif state == C.ST_QUOTA:
+            # Geen tijd in beeld (bijv. na een herstart, als de reset al geweest is
+            # en alleen de melding zonder tijd nog staat): neem de limietgegevens.
+            fallback = planner.api_reset_fallback(self.balance)
+            if fallback is not None:
+                snap.reset_at = fallback
+                snap.reset_clock = fallback.strftime("%H:%M")
+                self.last_reset = fallback
+                self.last_reset_clock = snap.reset_clock
+                self._reset_src = None
+                self._reset_attempted = False
         # 注意：额度横幅消失时不要清掉 last_reset。
         # 它还要用来判断"到点强试一次"，只在成功恢复后才清空。
 

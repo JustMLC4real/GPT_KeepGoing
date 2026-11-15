@@ -380,3 +380,16 @@ def test_settings_reset_labels_skip_purchases_and_pick_weekly():
               and any(m in n for m in C.WEEKLY_RESET_MARKERS)]
     assert weekly == [names[0]]
     assert any(m in "Credits aan werkruimte toevoegen" for m in C.PURCHASE_MARKERS)
+
+
+def test_api_reset_fallback_uses_five_hour_or_weekly():
+    five = "2026-11-15T13:04:40+01:00"
+    week = "2026-11-21T11:58:05+01:00"
+    bal = {"ok": True, "five_hour": {"resets_at": five, "remaining_percent": 0.0},
+           "weekly": {"resets_at": week, "remaining_percent": 24.0}}
+    got = planner.api_reset_fallback(bal)
+    assert (got.day, got.hour, got.minute) == (15, 13, 4), got
+    bal["weekly"]["remaining_percent"] = 0.0
+    got = planner.api_reset_fallback(bal)
+    assert (got.day, got.hour, got.minute) == (21, 11, 58), got
+    assert planner.api_reset_fallback({"ok": False}) is None
